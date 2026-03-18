@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BreathKit — Demo</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2a2d3a;
+      --text: #e8eaf0;
+      --muted: #7a7d8e;
+      --accent: #6c8aff;
+      --accent-soft: rgba(108, 138, 255, 0.12);
+      --inhale: #6c8aff;
+      --hold: #a78bfa;
+      --exhale: #34d399;
+      --hold-after: #f59e0b;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      padding: 32px 16px;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #6c8aff, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header p {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    /* ── Pattern Selector ── */
+    .pattern-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      max-width: 600px;
+    }
+    .pattern-btn {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 50px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 8px 18px;
+      transition: all 0.2s;
+    }
+    .pattern-btn:hover { border-color: var(--accent); color: var(--text); }
+    .pattern-btn.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ── Main Circle ── */
+    .circle-container {
+      position: relative;
+      width: 260px;
+      height: 260px;
+    }
+    .circle-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+    }
+    .circle-progress {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+    }
+    .circle-progress svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    .circle-progress circle {
+      fill: none;
+      stroke-width: 3;
+      stroke-linecap: round;
+      transition: stroke 0.5s ease;
+    }
+    .circle-progress circle.track { stroke: var(--border); }
+    .circle-progress circle.fill {
+      stroke: var(--accent);
+      stroke-dasharray: 720;
+      stroke-dashoffset: 720;
+      transition: stroke-dashoffset 1s linear, stroke 0.4s ease;
+    }
+
+    .circle-inner {
+      position: absolute;
+      inset: 20px;
+      border-radius: 50%;
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .phase-label {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      transition: color 0.4s;
+    }
+    .phase-timer {
+      font-size: 2.4rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      transition: color 0.4s;
+    }
+    .cycle-info {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* Pulse animation */
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    .circle-inner.inhaling { animation: pulse 1s ease-in-out infinite; }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .btn {
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 12px 28px;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      min-width: 130px;
+    }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-secondary {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      color: var(--muted);
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--text); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+    /* ── Cycles Config ── */
+    .cycles-config {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .cycles-config input[type="range"] {
+      accent-color: var(--accent);
+      width: 110px;
+    }
+    .cycles-config span {
+      min-width: 65px;
+      text-align: center;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* ── Custom Pattern Modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      width: min(480px, 90vw);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .modal h2 { font-size: 1.1rem; }
+    .phase-builder { display: flex; flex-direction: column; gap: 10px; }
+    .phase-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .phase-row input, .phase-row select {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.85rem;
+      padding: 8px 12px;
+      outline: none;
+    }
+    .phase-row input:focus, .phase-row select:focus { border-color: var(--accent); }
+    .phase-row button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 4px 8px;
+    }
+    .phase-row button:hover { color: #ef4444; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* ── Pattern description ── */
+    .pattern-desc {
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-align: center;
+      max-width: 360px;
+    }
+
+    /* ── Phase indicators ── */
+    .phase-dots {
+      display: flex;
+      gap: 8px;
+    }
+    .phase-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: all 0.3s;
+    }
+    .phase-dot.active { transform: scale(1.4); }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>🌬 BreathKit</h1>
+    <p>Exercices de respiration guidée — zéro distraction</p>
+  </div>
+
+  <!-- Pattern selector -->
+  <div class="pattern-selector" id="patternSelector">
+    <button class="pattern-btn active" data-pattern="coherenceCardiaque">Cohérence cardiaque</button>
+    <button class="pattern-btn" data-pattern="fourSevenEight">4-7-8</button>
+    <button class="pattern-btn" data-pattern="boxBreathing">Box Breathing</button>
+    <button class="pattern-btn" data-pattern="custom">Personnalisé…</button>
+  </div>
+
+  <p class="pattern-desc" id="patternDesc">5s inspirez / 5s expirez — idéal pour la régulation émotionnelle</p>
+
+  <!-- Breathing circle -->
+  <div class="circle-container">
+    <div class="circle-ring"></div>
+    <div class="circle-progress">
+      <svg viewBox="0 0 240 240">
+        <circle class="track" cx="120" cy="120" r="114" />
+        <circle class="fill" id="progressArc" cx="120" cy="120" r="114" />
+      </svg>
+    </div>
+    <div class="circle-inner" id="circleInner">
+      <div class="phase-label" id="phaseLabel">Prêt</div>
+      <div class="phase-timer" id="phaseTimer">–</div>
+      <div class="cycle-info" id="cycleInfo">Appuyez sur Démarrer</div>
+    </div>
+  </div>
+
+  <!-- Phase dots -->
+  <div class="phase-dots" id="phaseDots"></div>
+
+  <!-- Cycles config -->
+  <div class="cycles-config">
+    <label for="cyclesRange">Cycles :</label>
+    <input type="range" id="cyclesRange" min="0" max="20" value="0" step="1" />
+    <span id="cyclesLabel">Infini</span>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-secondary" id="stopBtn" disabled>Arrêter</button>
+    <button class="btn btn-primary" id="startBtn">Démarrer</button>
+  </div>
+
+  <!-- Custom pattern modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <h2>Créer un pattern personnalisé</h2>
+      <div class="phase-builder" id="phaseBuilder"></div>
+      <button class="btn btn-secondary" id="addPhaseBtn" style="align-self:flex-start;padding:8px 16px;font-size:0.82rem">+ Ajouter une phase</button>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modalCancelBtn">Annuler</button>
+        <button class="btn btn-primary" id="modalSaveBtn">Appliquer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BreathKit Library (inlined) -->
+  <script>
+    // ─── BreathKit Library ─────────────────────────────────────────────────────
+    const Patterns = {
+      coherenceCardiaque: {
+        id: "coherence-cardiaque",
+        name: "Cohérence cardiaque",
+        description: "5s inspirez / 5s expirez — idéal pour la régulation émotionnelle",
+        phases: [
+          { name: "inhale", label: "Inspirez", duration: 5 },
+          { name: "exhale", label: "Expirez", duration: 5 },
+        ],
+      },
+      fourSevenEight: {
+        id: "4-7-8",
+        name: "4-7-8",
+        description: "4s inspirez / 7s retenez / 8s expirez — anti-stress et sommeil",
+        phases: [
+          { name: "inhale", label: "Inspirez", duration: 4 },
+          { name: "hold", label: "Retenez", duration: 7 },
+          { name: "exhale", label: "Expirez", duration: 8 },
+        ],
+      },
+      boxBreathing: {
+        id: "box-breathing",
+        name: "Box Breathing",
+        description: "4s inspirez / 4s retenez / 4s expirez / 4s retenez — focus et calme",
+        phases: [
+          { name: "inhale", label: "Inspirez", duration: 4 },
+          { name: "hold", label: "Retenez", duration: 4 },
+          { name: "exhale", label: "Expirez", duration: 4 },
+          { name: "hold-after-exhale", label: "Retenez", duration: 4 },
+        ],
+      },
+    };
+
+    class BreathKit {
+      constructor(options) {
+        this.options = { cycles: 0, onPhaseChange: () => {}, onTick: () => {}, onCycleComplete: () => {}, onComplete: () => {}, ...options };
+        this._state = "idle";
+        this._currentPhaseIndex = 0;
+        this._currentCycle = 1;
+        this._secondsRemaining = 0;
+        this._intervalId = null;
+      }
+      get state() { return this._state; }
+      get currentPhaseIndex() { return this._currentPhaseIndex; }
+      get currentCycle() { return this._currentCycle; }
+      get secondsRemaining() { return this._secondsRemaining; }
+      get currentPhase() { return this.options.pattern.phases[this._currentPhaseIndex]; }
+
+      start() {
+        if (this._state === "running") return;
+        this._state = "running";
+        this._currentPhaseIndex = 0;
+        this._currentCycle = 1;
+        this._beginPhase();
+      }
+      pause() {
+        if (this._state !== "running") return;
+        this._state = "paused";
+        this._clearInterval();
+      }
+      resume() {
+        if (this._state !== "paused") return;
+        this._state = "running";
+        this._tick();
+      }
+      stop() {
+        this._clearInterval();
+        this._state = "idle";
+        this._currentPhaseIndex = 0;
+        this._currentCycle = 1;
+        this._secondsRemaining = 0;
+      }
+      _beginPhase() {
+        const phase = this.currentPhase;
+        this._secondsRemaining = phase.duration;
+        this.options.onPhaseChange(phase, this._currentPhaseIndex, this._currentCycle);
+        this.options.onTick(this._secondsRemaining, phase, this._currentCycle);
+        this._scheduleInterval();
+      }
+      _scheduleInterval() {
+        this._clearInterval();
+        this._intervalId = setInterval(() => this._tick(), 1000);
+      }
+      _tick() {
+        this._secondsRemaining -= 1;
+        if (this._secondsRemaining > 0) {
+          this.options.onTick(this._secondsRemaining, this.currentPhase, this._currentCycle);
+          return;
+        }
+        this._clearInterval();
+        this._advancePhase();
+      }
+      _advancePhase() {
+        const { pattern, cycles } = this.options;
+        const nextPhaseIndex = this._currentPhaseIndex + 1;
+        if (nextPhaseIndex < pattern.phases.length) {
+          this._currentPhaseIndex = nextPhaseIndex;
+          this._beginPhase();
+        } else {
+          this.options.onCycleComplete(this._currentCycle);
+          const isLastCycle = cycles !== 0 && this._currentCycle >= cycles;
+          if (isLastCycle) {
+            this._state = "completed";
+            this.options.onComplete();
+          } else {
+            this._currentCycle += 1;
+            this._currentPhaseIndex = 0;
+            this._beginPhase();
+          }
+        }
+      }
+      _clearInterval() {
+        if (this._intervalId !== null) { clearInterval(this._intervalId); this._intervalId = null; }
+      }
+    }
+
+    // ─── UI ────────────────────────────────────────────────────────────────────
+
+    const PHASE_COLORS = {
+      inhale: "#6c8aff",
+      hold: "#a78bfa",
+      exhale: "#34d399",
+      "hold-after-exhale": "#f59e0b",
+    };
+
+    const CIRCUMFERENCE = 2 * Math.PI * 114; // ~716
+
+    let activePattern = Patterns.coherenceCardiaque;
+    let customPattern = null;
+    let kit = null;
+
+    // Elements
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const phaseLabel = document.getElementById("phaseLabel");
+    const phaseTimer = document.getElementById("phaseTimer");
+    const cycleInfo = document.getElementById("cycleInfo");
+    const circleInner = document.getElementById("circleInner");
+    const progressArc = document.getElementById("progressArc");
+    const cyclesRange = document.getElementById("cyclesRange");
+    const cyclesLabel = document.getElementById("cyclesLabel");
+    const phaseDots = document.getElementById("phaseDots");
+    const patternDesc = document.getElementById("patternDesc");
+
+    // Pattern selector
+    document.getElementById("patternSelector").addEventListener("click", (e) => {
+      const btn = e.target.closest(".pattern-btn");
+      if (!btn) return;
+      const key = btn.dataset.pattern;
+      if (key === "custom") { openModal(); return; }
+      document.querySelectorAll(".pattern-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      activePattern = Patterns[key];
+      patternDesc.textContent = activePattern.description;
+      renderDots();
+      resetUI();
+    });
+
+    // Cycles range
+    cyclesRange.addEventListener("input", () => {
+      const v = parseInt(cyclesRange.value);
+      cyclesLabel.textContent = v === 0 ? "Infini" : `${v} cycle${v > 1 ? "s" : ""}`;
+    });
+
+    // Start / Pause / Resume
+    startBtn.addEventListener("click", () => {
+      if (!kit || kit.state === "idle" || kit.state === "completed") {
+        createAndStart();
+      } else if (kit.state === "running") {
+        kit.pause();
+        startBtn.textContent = "Reprendre";
+      } else if (kit.state === "paused") {
+        kit.resume();
+        startBtn.textContent = "Pause";
+      }
+    });
+
+    // Stop
+    stopBtn.addEventListener("click", () => {
+      if (kit) kit.stop();
+      resetUI();
+    });
+
+    function createAndStart() {
+      const cycles = parseInt(cyclesRange.value);
+      const pattern = customPattern || activePattern;
+
+      kit = new BreathKit({
+        pattern,
+        cycles,
+        onPhaseChange(phase, phaseIndex, cycleNumber) {
+          const color = PHASE_COLORS[phase.name] || "#6c8aff";
+          phaseLabel.textContent = phase.label;
+          phaseTimer.style.color = color;
+          progressArc.style.stroke = color;
+          progressArc.style.strokeDashoffset = CIRCUMFERENCE;
+
+          // Animate fill over phase duration
+          requestAnimationFrame(() => {
+            progressArc.style.strokeDashoffset = 0;
+            progressArc.style.transition = `stroke-dashoffset ${phase.duration}s linear, stroke 0.4s ease`;
+          });
+
+          // Pulse on inhale
+          circleInner.className = "circle-inner" + (phase.name === "inhale" ? " inhaling" : "");
+
+          // Active dot
+          document.querySelectorAll(".phase-dot").forEach((d, i) => {
+            d.classList.toggle("active", i === phaseIndex);
+            d.style.background = i === phaseIndex ? color : "var(--border)";
+          });
+
+          const cycleText = cycles === 0
+            ? `Cycle ${cycleNumber}`
+            : `Cycle ${cycleNumber} / ${cycles}`;
+          cycleInfo.textContent = cycleText;
+        },
+        onTick(secondsRemaining) {
+          phaseTimer.textContent = secondsRemaining + "s";
+        },
+        onCycleComplete() {},
+        onComplete() {
+          phaseLabel.textContent = "Terminé !";
+          phaseTimer.textContent = "✓";
+          cycleInfo.textContent = "Session complète";
+          startBtn.textContent = "Recommencer";
+          stopBtn.disabled = true;
+          circleInner.className = "circle-inner";
+        },
+      });
+
+      kit.start();
+      startBtn.textContent = "Pause";
+      stopBtn.disabled = false;
+    }
+
+    function resetUI() {
+      phaseLabel.textContent = "Prêt";
+      phaseTimer.textContent = "–";
+      cycleInfo.textContent = "Appuyez sur Démarrer";
+      startBtn.textContent = "Démarrer";
+      stopBtn.disabled = true;
+      circleInner.className = "circle-inner";
+      progressArc.style.strokeDashoffset = CIRCUMFERENCE;
+      progressArc.style.stroke = "var(--accent)";
+      document.querySelectorAll(".phase-dot").forEach(d => {
+        d.classList.remove("active");
+        d.style.background = "var(--border)";
+      });
+    }
+
+    function renderDots() {
+      const pattern = customPattern || activePattern;
+      phaseDots.innerHTML = "";
+      pattern.phases.forEach(() => {
+        const dot = document.createElement("div");
+        dot.className = "phase-dot";
+        phaseDots.appendChild(dot);
+      });
+    }
+
+    // Init progress arc
+    progressArc.style.strokeDasharray = CIRCUMFERENCE;
+    progressArc.style.strokeDashoffset = CIRCUMFERENCE;
+    progressArc.style.transition = "none";
+    renderDots();
+
+    // ─── Custom Pattern Modal ──────────────────────────────────────────────────
+
+    const modalOverlay = document.getElementById("modalOverlay");
+    const phaseBuilder = document.getElementById("phaseBuilder");
+    const addPhaseBtn = document.getElementById("addPhaseBtn");
+    const modalCancelBtn = document.getElementById("modalCancelBtn");
+    const modalSaveBtn = document.getElementById("modalSaveBtn");
+
+    let customPhases = [
+      { name: "inhale", label: "Inspirez", duration: 4 },
+      { name: "exhale", label: "Expirez", duration: 6 },
+    ];
+
+    function openModal() {
+      renderPhaseBuilder();
+      modalOverlay.classList.add("open");
+    }
+
+    modalCancelBtn.addEventListener("click", () => modalOverlay.classList.remove("open"));
+    modalOverlay.addEventListener("click", (e) => { if (e.target === modalOverlay) modalOverlay.classList.remove("open"); });
+
+    addPhaseBtn.addEventListener("click", () => {
+      customPhases.push({ name: "hold", label: "Retenez", duration: 4 });
+      renderPhaseBuilder();
+    });
+
+    modalSaveBtn.addEventListener("click", () => {
+      const rows = phaseBuilder.querySelectorAll(".phase-row");
+      const phases = [];
+      let valid = true;
+
+      rows.forEach(row => {
+        const name = row.querySelector("select").value;
+        const label = row.querySelector(".label-input").value.trim() || name;
+        const dur = parseInt(row.querySelector(".dur-input").value);
+        if (!dur || dur < 1) { valid = false; return; }
+        phases.push({ name, label, duration: dur });
+      });
+
+      if (!valid || phases.length === 0) {
+        alert("Toutes les phases doivent avoir une durée valide (≥1s).");
+        return;
+      }
+
+      customPattern = { id: "custom", name: "Personnalisé", description: "Pattern personnalisé", phases };
+      document.querySelectorAll(".pattern-btn").forEach(b => {
+        b.classList.toggle("active", b.dataset.pattern === "custom");
+      });
+      patternDesc.textContent = phases.map(p => `${p.duration}s ${p.label.toLowerCase()}`).join(" / ");
+      activePattern = customPattern;
+      renderDots();
+      resetUI();
+      modalOverlay.classList.remove("open");
+    });
+
+    function renderPhaseBuilder() {
+      phaseBuilder.innerHTML = "";
+      customPhases.forEach((phase, i) => {
+        const row = document.createElement("div");
+        row.className = "phase-row";
+        row.innerHTML = `
+          <select>
+            <option value="inhale" ${phase.name === "inhale" ? "selected" : ""}>Inspiration</option>
+            <option value="exhale" ${phase.name === "exhale" ? "selected" : ""}>Expiration</option>
+            <option value="hold" ${phase.name === "hold" ? "selected" : ""}>Rétention</option>
+            <option value="hold-after-exhale" ${phase.name === "hold-after-exhale" ? "selected" : ""}>Rétention basse</option>
+          </select>
+          <input class="dur-input" type="number" min="1" max="60" value="${phase.duration}" placeholder="sec" />
+          <button title="Supprimer">×</button>
+        `;
+        row.querySelector("select").addEventListener("change", e => { customPhases[i].name = e.target.value; });
+        row.querySelector(".dur-input").addEventListener("input", e => { customPhases[i].duration = parseInt(e.target.value) || 0; });
+        row.querySelector("button").addEventListener("click", () => {
+          if (customPhases.length <= 1) return;
+          customPhases.splice(i, 1);
+          renderPhaseBuilder();
+        });
+        phaseBuilder.appendChild(row);
+      });
+    }
+  </script>
+</body>
+</html>
