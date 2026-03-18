@@ -5,7 +5,7 @@ A zero-dependency TypeScript library for guided breathing exercises — box brea
 [![npm version](https://img.shields.io/npm/v/breathkit.svg)](https://www.npmjs.com/package/breathkit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**[Live Demo →](https://nicolas-deleplace.github.io/breathKit/demo)**
+**[Live Demo →](https://nicolas-deleplace.github.io/breathKit)**
 
 ---
 
